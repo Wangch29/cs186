@@ -1,7 +1,6 @@
 package edu.berkeley.cs186.database.index;
 
 import edu.berkeley.cs186.database.TimeoutScaling;
-import edu.berkeley.cs186.database.categories.HiddenTests;
 import edu.berkeley.cs186.database.categories.Proj2Tests;
 import edu.berkeley.cs186.database.categories.PublicTests;
 import edu.berkeley.cs186.database.categories.SystemTests;
@@ -484,5 +483,25 @@ public class TestBPlusTree {
         assertEquals(3, LeafNode.maxOrder(pageSizeInBytes, keySchema));
         assertEquals(3, InnerNode.maxOrder(pageSizeInBytes, keySchema));
         assertEquals(3, BPlusTree.maxOrder(pageSizeInBytes, keySchema));
+    }
+
+    @Test
+    @Category(SystemTests.class)
+    public void testEverythingDeleted() {
+        BPlusTree bTree = getBPlusTree(Type.intType(), 2);
+
+        for (int i = 0; i < 100; i++) {
+            bTree.put(new IntDataBox(i), new RecordId((long) i, (short) i));
+        }
+
+        //Iterator<RecordId> it = bTree.scanAll();
+        //assertTrue(it.hasNext());
+
+        for (int i = 0; i < 100; i++) {
+            bTree.remove(new IntDataBox(i));
+        }
+
+        Iterator<RecordId> it = bTree.scanAll();
+        assertFalse(it.hasNext());
     }
 }

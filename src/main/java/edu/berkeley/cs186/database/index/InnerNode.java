@@ -13,17 +13,17 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
- * A inner node of a B+ tree. Every inner node in a B+ tree of order d stores
+ * An inner node of a B+ tree. Every inner node in a B+ tree of order d stores
  * between d and 2d keys. An inner node with n keys stores n + 1 "pointers" to
  * children nodes (where a pointer is just a page number). Moreover, every
  * inner node is serialized and persisted on a single page; see toBytes and
  * fromBytes for details on how an inner node is serialized. For example, here
  * is an illustration of an order 2 inner node:
- *
- *     +----+----+----+----+
- *     | 10 | 20 | 30 |    |
- *     +----+----+----+----+
- *    /     |    |     \
+ * <p>
+ * +----+----+----+----+
+ * | 10 | 20 | 30 |    |
+ * +----+----+----+----+
+ * /     |    |     \
  */
 class InnerNode extends BPlusNode {
     // Metadata about the B+ tree that this node belongs to.
@@ -46,13 +46,14 @@ class InnerNode extends BPlusNode {
     private List<Long> children;
 
     // Constructors ////////////////////////////////////////////////////////////
+
     /**
      * Construct a brand new inner node.
      */
     InnerNode(BPlusTreeMetadata metadata, BufferManager bufferManager, List<DataBox> keys,
               List<Long> children, LockContext treeContext) {
         this(metadata, bufferManager, bufferManager.fetchNewPage(treeContext, metadata.getPartNum()),
-             keys, children, treeContext);
+                keys, children, treeContext);
     }
 
     /**
@@ -62,7 +63,6 @@ class InnerNode extends BPlusNode {
                       List<DataBox> keys, List<Long> children, LockContext treeContext) {
         try {
             assert (keys.size() <= 2 * metadata.getOrder());
-            assert (keys.size() + 1 == children.size());
 
             this.metadata = metadata;
             this.bufferManager = bufferManager;
@@ -80,43 +80,113 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
+        assert (this.keys.size() + 1 == this.children.size());
 
-        return null;
+        int index = numLessThanEqual(key, this.keys);
+        BPlusNode nextNode = this.getChild(index);
+
+        if (nextNode.getClass() == LeafNode.class) {
+            return (LeafNode) nextNode;
+        }
+        return ((InnerNode) nextNode).get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        assert(children.size() > 0);
-        // TODO(proj2): implement
+        assert (!children.isEmpty());
 
-        return null;
+        BPlusNode nextNode = BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext,
+                this.children.get(0));
+        if (nextNode.getClass() == LeafNode.class) {
+            return (LeafNode) nextNode;
+        }
+        return ((InnerNode) nextNode).getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        BPlusNode nextNode = this.getChild(numLessThanEqual(key, this.keys));
+        Optional<Pair<DataBox, Long>> returnedPair = nextNode.put(key, rid);
 
-        return Optional.empty();
+        /* No new key. */
+        if (returnedPair.isEmpty()) {
+            return Optional.empty();
+        }
+
+        /* Insert a new key. */
+        return addNewFanout(returnedPair.get().getFirst(), returnedPair.get().getSecond());
     }
 
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
-            float fillFactor) {
-        // TODO(proj2): implement
+                                                  float fillFactor) {
+        while (data.hasNext()) {
+            BPlusNode rightNode = this.getRightmostLeaf();
+            Optional<Pair<DataBox, Long>> pair = rightNode.bulkLoad(data, fillFactor);
+            if (pair.isPresent()) {  // Add new fanout to inner node.
+                /* Insert a new key. */
+                Optional<Pair<DataBox, Long>> p = addNewFanout(pair.get().getFirst(), pair.get().getSecond());
+                if (p.isPresent()) {
+                    return p;
+                }
+            }
+        }
 
         return Optional.empty();
+    }
+
+    /**
+     * Adds a new key-value pair to the inner node, possibly overflowing to a new
+     * inner node.
+     *
+     * @param newKey   the new key to insert
+     * @param newChild the new child page to insert
+     * @return a pair containing the middle key and the new inner node page if
+     * overflow occurred, or an empty optional if no overflow occurred
+     */
+    private Optional<Pair<DataBox, Long>> addNewFanout(DataBox newKey, Long newChild) {
+        int order = this.metadata.getOrder();
+        int index = numLessThanEqual(newKey, this.keys);
+        this.keys.add(index, newKey);
+        this.children.add(index + 1, newChild);
+
+        /* Not overflow. */
+        if (this.keys.size() <= 2 * order) {
+            sync();
+            return Optional.empty();
+        }
+
+        /* Overflow. */
+        assert (this.keys.size() == 2 * order + 1);
+
+        DataBox midEntry = this.keys.get(order);
+        List<DataBox> newKeys = new ArrayList<>(this.keys.subList(order + 1, 2 * order + 1));
+        this.keys.subList(order, 2 * order + 1).clear();
+        List<Long> newChildren = new ArrayList<>(this.children.subList(order + 1, 2 * order + 2));
+        this.children.subList(order + 1, 2 * order + 2).clear();
+
+        InnerNode newIN = new InnerNode(this.metadata, this.bufferManager, newKeys, newChildren, this.treeContext);
+        this.sync();
+        newIN.sync();
+
+        return Optional.of(new Pair<>(midEntry, newIN.getPage().getPageNum()));
+    }
+
+    private BPlusNode getRightmostLeaf() {
+        assert (!children.isEmpty());
+
+        return BPlusNode.fromBytes(this.metadata, this.bufferManager, this.treeContext,
+                this.children.get(this.children.size() - 1));
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        BPlusNode child = getChild(numLessThanEqual(key, this.keys));
+        child.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
@@ -154,6 +224,7 @@ class InnerNode extends BPlusNode {
     List<Long> getChildren() {
         return children;
     }
+
     /**
      * Returns the largest number d such that the serialization of an InnerNode
      * with 2d keys will fit on a single page.
@@ -189,25 +260,25 @@ class InnerNode extends BPlusNode {
      * Given a list ys sorted in ascending order, numLessThanEqual(x, ys) returns
      * the number of elements in ys that are less than or equal to x. For
      * example,
-     *
-     *   numLessThanEqual(0, Arrays.asList(1, 2, 3, 4, 5)) == 0
-     *   numLessThanEqual(1, Arrays.asList(1, 2, 3, 4, 5)) == 1
-     *   numLessThanEqual(2, Arrays.asList(1, 2, 3, 4, 5)) == 2
-     *   numLessThanEqual(3, Arrays.asList(1, 2, 3, 4, 5)) == 3
-     *   numLessThanEqual(4, Arrays.asList(1, 2, 3, 4, 5)) == 4
-     *   numLessThanEqual(5, Arrays.asList(1, 2, 3, 4, 5)) == 5
-     *   numLessThanEqual(6, Arrays.asList(1, 2, 3, 4, 5)) == 5
-     *
+     * <p>
+     * numLessThanEqual(0, Arrays.asList(1, 2, 3, 4, 5)) == 0
+     * numLessThanEqual(1, Arrays.asList(1, 2, 3, 4, 5)) == 1
+     * numLessThanEqual(2, Arrays.asList(1, 2, 3, 4, 5)) == 2
+     * numLessThanEqual(3, Arrays.asList(1, 2, 3, 4, 5)) == 3
+     * numLessThanEqual(4, Arrays.asList(1, 2, 3, 4, 5)) == 4
+     * numLessThanEqual(5, Arrays.asList(1, 2, 3, 4, 5)) == 5
+     * numLessThanEqual(6, Arrays.asList(1, 2, 3, 4, 5)) == 5
+     * <p>
      * This helper function is useful when we're navigating down a B+ tree and
      * need to decide which child to visit. For example, imagine an index node
      * with the following 4 keys and 5 children pointers:
-     *
-     *     +---+---+---+---+
-     *     | a | b | c | d |
-     *     +---+---+---+---+
-     *    /    |   |   |    \
-     *   0     1   2   3     4
-     *
+     * <p>
+     * +---+---+---+---+
+     * | a | b | c | d |
+     * +---+---+---+---+
+     * /    |   |   |    \
+     * 0     1   2   3     4
+     * <p>
      * If we're searching the tree for value c, then we need to visit child 3.
      * Not coincidentally, there are also 3 values less than or equal to c (i.e.
      * a, b, c).
@@ -260,11 +331,11 @@ class InnerNode extends BPlusNode {
     /**
      * An inner node on page 0 with a single key k and two children on page 1 and
      * 2 is turned into the following DOT fragment:
-     *
-     *   node0[label = "<f0>|k|<f1>"];
-     *   ... // children
-     *   "node0":f0 -> "node1";
-     *   "node0":f1 -> "node2";
+     * <p>
+     * node0[label = "<f0>|k|<f1>"];
+     * ... // children
+     * "node0":f0 -> "node1";
+     * "node0":f1 -> "node2";
      */
     @Override
     public String toDot() {
@@ -286,7 +357,7 @@ class InnerNode extends BPlusNode {
             long childPageNum = child.getPage().getPageNum();
             lines.add(child.toDot());
             lines.add(String.format("  \"node%d\":f%d -> \"node%d\";",
-                                    pageNum, i, childPageNum));
+                    pageNum, i, childPageNum));
         }
 
         return String.join("\n", lines);
@@ -340,12 +411,14 @@ class InnerNode extends BPlusNode {
      * Loads an inner node from page `pageNum`.
      */
     public static InnerNode fromBytes(BPlusTreeMetadata metadata,
-                                      BufferManager bufferManager, LockContext treeContext, long pageNum) {
+                                      BufferManager bufferManager,
+                                      LockContext treeContext,
+                                      long pageNum) {
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buf = page.getBuffer();
 
         byte nodeType = buf.get();
-        assert(nodeType == (byte) 0);
+        assert (nodeType == (byte) 0);
 
         List<DataBox> keys = new ArrayList<>();
         List<Long> children = new ArrayList<>();
@@ -370,8 +443,8 @@ class InnerNode extends BPlusNode {
         }
         InnerNode n = (InnerNode) o;
         return page.getPageNum() == n.page.getPageNum() &&
-               keys.equals(n.keys) &&
-               children.equals(n.children);
+                keys.equals(n.keys) &&
+                children.equals(n.children);
     }
 
     @Override

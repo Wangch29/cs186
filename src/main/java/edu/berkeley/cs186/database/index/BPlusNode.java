@@ -33,13 +33,13 @@ abstract class BPlusNode {
      *   |  1 |  2 |  3 |    |->| 11 | 12 | 13 |    |->| 21 | 22 | 23 |    |
      *   +----+----+----+----+  +----+----+----+----+  +----+----+----+----+
      *   leaf0                  leaf1                  leaf2
-     *
+     * <p>
      * inner.get(x) should return
-     *
+     * <p>
      *   - leaf0 when x < 10,
      *   - leaf1 when 10 <= x < 20, and
      *   - leaf2 when x >= 20.
-     *
+     * <p>
      * Note that inner.get(4) would return leaf0 even though leaf0 doesn't
      * actually contain 4.
      */
@@ -55,7 +55,7 @@ abstract class BPlusNode {
     /**
      * n.put(k, r) inserts the pair (k, r) into the subtree rooted by n. There
      * are two cases to consider:
-     *
+     * <p>
      *   Case 1: If inserting the pair (k, r) does NOT cause n to overflow, then
      *           Optional.empty() is returned.
      *   Case 2: If inserting the pair (k, r) does cause the node n to overflow,
@@ -119,17 +119,17 @@ abstract class BPlusNode {
      *   +---+---+---+---+
      *
      * into the following two inner nodes
-     *
+     * <p>
      *   +---+---+---+---+  +---+---+---+---+
      *   | 1 | 2 |   |   |  | 4 | 5 |   |   |
      *   +---+---+---+---+  +---+---+---+---+
-     *
+     * <p>
      * with a split key of 3.
-     *
+     * <p>
      * DO NOT redistribute entries in any other way besides what we have
      * described. For example, do not move entries between nodes to avoid
      * splitting.
-     *
+     * <p>
      * Our B+ trees do not support duplicate entries with the same key. If a
      * duplicate key is inserted into a leaf node, the tree is left unchanged
      * and a BPlusTreeException is raised.
@@ -139,22 +139,22 @@ abstract class BPlusNode {
     /**
      * n.bulkLoad(data, fillFactor) bulk loads pairs of (k, r) from data into
      * the tree with the given fill factor.
-     *
+     * <p>
      * This method is very similar to n.put, with a couple of differences:
-     *
+     * <p>
      * 1. Leaf nodes do not fill up to 2*d+1 and split, but rather, fill up to
      * be 1 record more than fillFactor full, then "splits" by creating a right
      * sibling that contains just one record (leaving the original node with
      * the desired fill factor).
-     *
+     * <p>
      * 2. Inner nodes should repeatedly try to bulk load the rightmost child
      * until either the inner node is full (in which case it should split)
      * or there is no more data.
-     *
+     * <p>
      * fillFactor should ONLY be used for determining how full leaf nodes are
      * (not inner nodes), and calculations should round up, i.e. with d=5
      * and fillFactor=0.75, leaf nodes should be 8/10 full.
-     *
+     * <p>
      * You can assume that 0 < fillFactor <= 1 for testing purposes, and that
      * a fill factor outside of that range will result in undefined behavior
      * (you're free to handle those cases however you like).
