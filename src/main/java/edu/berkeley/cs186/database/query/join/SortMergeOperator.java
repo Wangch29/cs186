@@ -138,6 +138,10 @@ public class SortMergeOperator extends JoinOperator {
          * or null if there are no more records to join.
          */
         private Record fetchNextRecord() {
+            if (this.leftRecord == null || this.rightRecord == null) {
+                return null;
+            }
+
             while (this.rightIterator.hasNext() || this.leftIterator.hasNext()) {
                 if (!this.marked) {
                     while (compare(this.leftRecord, this.rightRecord) < 0 && this.leftIterator.hasNext()) {
@@ -158,6 +162,9 @@ public class SortMergeOperator extends JoinOperator {
                         this.rightRecord = rightIterator.next();
                         if (this.leftIterator.hasNext()) {
                             this.leftRecord = this.leftIterator.next();
+                        } else {
+                            this.leftRecord = null;
+                            this.rightRecord = null;
                         }
                         this.marked = false;
                     }
@@ -167,12 +174,16 @@ public class SortMergeOperator extends JoinOperator {
                     this.rightRecord = rightIterator.next();
                     if (this.leftIterator.hasNext()) {
                         this.leftRecord = this.leftIterator.next();
+                    } else {
+                        this.leftRecord = null;
+                        this.rightRecord = null;
+                        return null;
                     }
                     this.marked = false;
                 }
             }
 
-            // Output the last record.
+            /* Output the last record. */
             if (this.leftRecord != null && this.rightRecord != null) {
                 if (compare(this.leftRecord, this.rightRecord) == 0) {
                     this.nextRecord = this.leftRecord.concat(this.rightRecord);
@@ -180,6 +191,8 @@ public class SortMergeOperator extends JoinOperator {
                     this.rightRecord = null;
                     return this.nextRecord;
                 }
+                this.leftRecord = null;
+                this.rightRecord = null;
             }
 
             return null;
