@@ -21,7 +21,27 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+
+        // No lock.
+        if (a == NL || b == NL) {
+            return true;
+        }
+
+        // Intention shared.
+        if (a == IS) {
+            return b != X;
+        }
+        if (b == IS) {
+            return a != X;
+        }
+
+        // Intention exclusive and shared.
+        if (a == IX && b == IX) {
+            return true;
+        }
+        if (a == S && b == S) {
+            return true;
+        }
 
         return false;
     }
@@ -53,7 +73,26 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+
+        // No lock.
+        if (childLockType == NL) {
+            return true;
+        }
+
+        // Shared and intention shared.
+        if (parentLockType == IS) {
+            return childLockType == S || childLockType == IS;
+        }
+
+        // Exclusive and intention exclusive.
+        if (parentLockType == IX) {
+            return true;
+        }
+
+        // Shared intention exclusive.
+        if (parentLockType == SIX) {
+            return true;
+        }
 
         return false;
     }
@@ -68,7 +107,30 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+
+        if (required == NL) {
+            return true;
+        }
+
+        if (required == S) {
+            return substitute == S || substitute == X || substitute == SIX;
+        }
+
+        if (required == X) {
+            return substitute == X;
+        }
+
+        if (required == IS) {
+            return substitute == IS || substitute == IX;
+        }
+
+        if (required == IX) {
+            return substitute == IX || substitute == SIX;
+        }
+
+        if (required == SIX) {
+            return substitute == SIX;
+        }
 
         return false;
     }

@@ -158,7 +158,7 @@ public class TestLockManager {
          * Transaction 0 acquires an X lock on dbResource
          * Transaction 1 attempts to acquire an X lock on dbResource but
          *   blocks due to a conflict with Transaction 0's X lock
-         *
+         * <p>
          * After this:
          *   Transaction 0 should have an X lock on dbResource
          *   Transaction 1 should have no lock on dbResource
@@ -182,7 +182,7 @@ public class TestLockManager {
         /**
          * Transaction 0 releases its lock on dbResource
          * Transaction 1 should unblock, and acquire an X lock on dbResource
-         *
+         * <p>
          * After this:
          *   Transaction 0 should have no lock on dbResource
          *   Transaction 1 should have an X lock dbResource
@@ -351,7 +351,7 @@ public class TestLockManager {
          *    blocks due to a conflict with Transaction 0's S lock
          * Transaction 2 attempts to acquire an S lock on dbResource but
          *    blocks due to existing queue
-         *
+         * <p>
          * After this:
          *    dbResource should have an S lock from Transaction 0
          *    dbResource should have [X (T1), S (T2)] in its queue
@@ -377,7 +377,7 @@ public class TestLockManager {
          * Transaction 0 releases its S lock on dbResource
          * Transaction 1 should unblock and acquire an X lock on dbResource
          * Transaction 2 will move forward in the queue, but still be blocked
-         *
+         * <p>
          * After this:
          *    dbResource should have an X lock from Transaction 1
          *    dbResource should have [S (T2)] in its queue
@@ -399,7 +399,7 @@ public class TestLockManager {
         /**
          * Transaction 1 releases its X lock on dbResource
          * Transaction 2 should unblock and acquire an S lock on dbResource
-         *
+         * <p>
          * After this:
          *    dbResource should have an S lock from Transaction 1
          *    All transactions should be unblocked
